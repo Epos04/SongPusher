@@ -101,6 +101,7 @@
               </summary>
               <ul id="archive-list" class="space-y-3 mt-4 border-l-2 border-border pl-6"></ul>
           </details>
+          <button id="clear-archive-button" class="hidden mt-4 text-sm text-destructive hover:text-destructive/80 transition-opacity w-full text-center p-2 rounded-lg">Archiv leeren</button>
       </div>
   </div>
 
@@ -127,6 +128,8 @@
           lightIcon: document.getElementById('theme-icon-light'),
           darkIcon: document.getElementById('theme-icon-dark'),
           songTitleInput: document.getElementById('song-title'),
+          // NEUES ELEMENT HINZUGEFÜGT
+          clearArchiveButton: document.getElementById('clear-archive-button'),
       };
 
       let songData = [];
@@ -193,8 +196,24 @@
         elements.voteSlider.addEventListener('input', (e) => elements.voteCountInput.value = e.target.value);
         elements.voteCountInput.addEventListener('input', (e) => elements.voteSlider.value = e.target.value);
         elements.themeToggle.addEventListener('click', toggleTheme);
+        // NEUER EVENT LISTENER
+        elements.clearArchiveButton.addEventListener('click', clearArchive);
       }
       
+      // NEUE FUNKTION ZUM LEEREN DES ARCHIVS
+      function clearArchive() {
+          const archivedSongs = songData.filter(s => s.status === 'completed');
+          if (archivedSongs.length === 0) {
+              alert('Das Archiv ist bereits leer.');
+              return;
+          }
+          if (confirm(`Möchtest du wirklich alle ${archivedSongs.length} Lieder aus dem Archiv löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
+              songData = songData.filter(s => s.status !== 'completed');
+              saveData();
+              renderAllLists();
+          }
+      }
+
       function applyInitialTheme() {
         const savedTheme = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -229,7 +248,10 @@
               completedAt: null
           };
           
-          songData.unshift(newSong); 
+          const activeSongs = songData.filter(s => s.status !== 'completed');
+          const archivedSongs = songData.filter(s => s.status === 'completed');
+          songData = [newSong, ...activeSongs, ...archivedSongs];
+
           saveData();
           renderAllLists();
           
@@ -256,8 +278,10 @@
           elements.archiveList.innerHTML = '';
           elements.archiveSummaryText.textContent = `Archiv (${archivedSongs.length})`;
           if (archivedSongs.length > 0) {
+            elements.clearArchiveButton.classList.remove('hidden');
             archivedSongs.forEach(song => elements.archiveList.appendChild(createSongElement(song)));
           } else {
+            elements.clearArchiveButton.classList.add('hidden');
             elements.archiveList.innerHTML = `<li class="text-muted-foreground">Das Archiv ist leer.</li>`;
           }
           
@@ -393,12 +417,10 @@
 
       function processQueue() {
           if (currentlyProcessingId) return;
-
-          // KORREKTUR: Wählt den letzten Song aus der Liste aus, statt des ersten.
+          
           const queuedSongs = songData.filter(s => s.status === 'queued');
           if (queuedSongs.length === 0) return;
           
-          // Nimm den letzten Song in der Liste (visuell der unterste)
           const songToProcess = queuedSongs[queuedSongs.length - 1];
           
           if (!songToProcess) return;
