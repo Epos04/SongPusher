@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SongPusher</title>
+  
+  <link href="./src/output.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+
+  <style>
+    .details-arrow { transition: transform 0.2s; }
+    details[open] > summary .details-arrow { transform: rotate(90deg); }
+    .sortable-ghost { opacity: 0.4; background-color: #4a5568; }
+    .sortable-chosen { cursor: grabbing; }
+    
+    .delete-bg {
+        background-color: var(--destructive);
+        color: var(--destructive-foreground);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 1.5rem;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 0;
+        opacity: 0;
+        border-radius: 0.5rem;
+    }
+  </style>
+</head>
+<body class="bg-background text-foreground font-sans min-h-screen flex flex-col items-center justify-center p-4 gap-4 transition-colors duration-300">
+
+  <div id="pin-screen" class="w-full max-w-md hidden">
+    <div class="bg-card rounded-lg shadow-lg p-8 space-y-6">
+      <div class="text-center">
+        <h1 class="text-2xl font-bold text-card-foreground">Veranstaltungspin eingeben</h1>
+        <p class="text-muted-foreground mt-2">Der Pin wird nur lokal gespeichert.</p>
+      </div>
+      <form id="pin-form" class="space-y-4">
+        <input id="pin-input" type="text" placeholder="Veranstaltungspin" required class="w-full text-center tracking-widest px-4 py-3 bg-input border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring" />
+        <button type="submit" class="w-full flex justify-center py-3 px-4 bg-primary text-primary-foreground font-semibold rounded-md shadow-sm hover:opacity-90 transition-opacity">Speichern & Starten</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="main-app-screen" class="w-full max-w-md hidden">
+    <div class="relative bg-card rounded-lg shadow-lg p-8">
+      <button id="theme-toggle" type="button" class="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition">
+          <svg id="theme-icon-light" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          <svg id="theme-icon-dark" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+      </button>
+      <div class="space-y-6">
+        <div class="text-center">
+          <h1 class="text-3xl font-bold text-card-foreground">SongPusher</h1>
+          <div id="pin-display-container" class="mt-2 flex justify-center items-center gap-2">
+            <span id="pin-display" class="text-sm font-mono text-muted-foreground"></span>
+            <button id="edit-pin-button" title="PIN bearbeiten" class="text-muted-foreground hover:text-foreground transition">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+        </div>
+        <div id="form-container" class="space-y-6">
+          <div>
+              <label for="song-title" class="block text-sm font-medium text-muted-foreground">Songtitel</label>
+              <div class="mt-2"><input id="song-title" type="text" placeholder="z.B. Después De La 1" class="w-full px-4 py-3 bg-input border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring" /></div>
+          </div>
+          <div>
+              <label for="vote-count" class="block text-sm font-medium text-muted-foreground">Anzahl der Votes</label>
+              <div class="mt-2 space-y-3">
+                  <input id="vote-count" type="number" value="20" min="1" class="w-full px-4 py-3 bg-input border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring" />
+                  <input id="vote-slider" type="range" min="1" max="100" value="20" class="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary" />
+              </div>
+          </div>
+          <div><button id="add-song-button" type="button" class="w-full flex justify-center items-center gap-2 py-3 px-4 bg-primary text-primary-foreground font-semibold rounded-md shadow-sm hover:opacity-90 transition-opacity">Zur Warteschlange hinzufügen</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="stats-container" class="w-full max-w-md hidden text-center">
+    <p class="text-sm text-muted-foreground">
+      <span id="completed-count" class="font-bold">0</span> von <span id="total-count" class="font-bold">0</span> Liedern gevotet
+    </p>
+  </div>
+  
+  <div id="queue-and-archive-container" class="w-full max-w-md hidden">
+      <div id="active-queue-container">
+          <h2 class="text-lg font-semibold text-foreground mb-4">Aktive Warteschlange</h2>
+          <ul id="active-queue-list" class="space-y-3"></ul>
+      </div>
+      <div id="archive-container" class="mt-8">
+          <details>
+              <summary class="cursor-pointer font-semibold text-foreground flex items-center gap-2">
+                  <svg class="h-5 w-5 details-arrow text-muted-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+                  <span id="archive-summary-text">Archiv</span>
+              </summary>
+              <ul id="archive-list" class="space-y-3 mt-4 border-l-2 border-border pl-6"></ul>
+          </details>
+      </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const elements = {
+          pinScreen: document.getElementById('pin-screen'),
+          mainAppScreen: document.getElementById('main-app-screen'),
+          statsContainer: document.getElementById('stats-container'),
+          queueAndArchiveContainer: document.getElementById('queue-and-archive-container'),
+          pinForm: document.getElementById('pin-form'),
+          pinInput: document.getElementById('pin-input'),
+          pinDisplay: document.getElementById('pin-display'),
+          editPinButton: document.getElementById('edit-pin-button'),
+          addSongButton: document.getElementById('add-song-button'),
+          activeQueueList: document.getElementById('active-queue-list'),
+          archiveList: document.getElementById('archive-list'),
+          archiveSummaryText: document.getElementById('archive-summary-text'),
+          completedCount: document.getElementById('completed-count'),
+          totalCount: document.getElementById('total-count'),
+          voteCountInput: document.getElementById('vote-count'),
+          voteSlider: document.getElementById('vote-slider'),
+          themeToggle: document.getElementById('theme-toggle'),
+          lightIcon: document.getElementById('theme-icon-light'),
+          darkIcon: document.getElementById('theme-icon-dark'),
+          songTitleInput: document.getElementById('song-title'),
+      };
+
+      let songData = [];
+      let currentlyProcessingId = null;
+      let currentIntervalId = null;
+
+      function init() {
+        applyInitialTheme();
+        loadData();
+        setupEventListeners();
+        renderAllLists();
+        initializeSortable();
+        processQueue(); 
+      }
+
+      function loadData() {
+        try {
+          songData = JSON.parse(localStorage.getItem('songData') || '[]');
+          songData.forEach(song => {
+            if (song.status === 'voting') song.status = 'queued';
+            if (typeof song.progress === 'undefined') song.progress = 0;
+          });
+          saveData();
+        } catch (error) {
+          console.error("Fehler beim Laden der Song-Daten:", error);
+          songData = [];
+        }
+
+        if (localStorage.getItem('clubPin')) {
+          showMainApp();
+        } else {
+          showPinScreen();
+        }
+      }
+
+      function showPinScreen() {
+        elements.mainAppScreen.classList.add('hidden');
+        elements.statsContainer.classList.add('hidden');
+        elements.queueAndArchiveContainer.classList.add('hidden');
+        elements.pinScreen.classList.remove('hidden');
+      }
+
+      function showMainApp() {
+        elements.pinScreen.classList.add('hidden');
+        elements.mainAppScreen.classList.remove('hidden');
+        elements.statsContainer.classList.remove('hidden');
+        elements.queueAndArchiveContainer.classList.remove('hidden');
+        elements.pinDisplay.textContent = `PIN: ${localStorage.getItem('clubPin') || ''}`;
+      }
+
+      function setupEventListeners() {
+        elements.pinForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const pinValue = elements.pinInput.value.trim();
+          if (pinValue) {
+            localStorage.setItem('clubPin', pinValue);
+            showMainApp();
+          }
+        });
+        elements.editPinButton.addEventListener('click', () => {
+          if (confirm('Möchtest du den Veranstaltungspin wirklich ändern?')) showPinScreen();
+        });
+        elements.addSongButton.addEventListener('click', handleAddSong);
+        elements.voteSlider.addEventListener('input', (e) => elements.voteCountInput.value = e.target.value);
+        elements.voteCountInput.addEventListener('input', (e) => elements.voteSlider.value = e.target.value);
+        elements.themeToggle.addEventListener('click', toggleTheme);
+      }
+      
+      function applyInitialTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+        document.documentElement.classList.toggle('dark', isDark);
+        updateThemeIcons(isDark);
+      }
+
+      function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        updateThemeIcons(isDark);
+      }
+
+      function updateThemeIcons(isDark) {
+          elements.lightIcon.style.display = isDark ? 'none' : 'block';
+          elements.darkIcon.style.display = isDark ? 'block' : 'none';
+      }
+
+      function handleAddSong() {
+          const songTitle = elements.songTitleInput.value.trim();
+          if (!songTitle) {
+            alert('Bitte einen Songtitel eingeben.');
+            return;
+          }
+          const newSong = {
+              id: Date.now(),
+              title: songTitle,
+              votes: elements.voteCountInput.value,
+              status: 'queued',
+              progress: 0,
+              completedAt: null
+          };
+          
+          songData.unshift(newSong); 
+          saveData();
+          renderAllLists();
+          
+          if (!currentlyProcessingId) {
+            processQueue();
+          }
+          elements.songTitleInput.value = '';
+          elements.songTitleInput.focus();
+      }
+      
+      function renderAllLists() {
+          const activeSongs = songData.filter(s => s.status === 'queued' || s.status === 'voting');
+          const archivedSongs = songData.filter(s => s.status === 'completed').sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+
+          elements.activeQueueList.innerHTML = '';
+          if (activeSongs.length > 0) {
+              activeSongs.forEach(song => elements.activeQueueList.appendChild(createSongElement(song)));
+          } else {
+              elements.activeQueueList.innerHTML = `<li class="empty-message text-center text-muted-foreground bg-card/50 rounded-lg p-6">Keine aktiven Songs.</li>`;
+          }
+
+          setupSwipeToDelete();
+
+          elements.archiveList.innerHTML = '';
+          elements.archiveSummaryText.textContent = `Archiv (${archivedSongs.length})`;
+          if (archivedSongs.length > 0) {
+            archivedSongs.forEach(song => elements.archiveList.appendChild(createSongElement(song)));
+          } else {
+            elements.archiveList.innerHTML = `<li class="text-muted-foreground">Das Archiv ist leer.</li>`;
+          }
+          
+          updateStats();
+      }
+      
+      function updateStats() {
+          elements.completedCount.textContent = songData.filter(s => s.status === 'completed').length;
+          elements.totalCount.textContent = songData.length;
+      }
+
+      function getStatusInfo(song) {
+          const statusMap = {
+              voting: { text: 'Wird gevotet...', color: 'bg-blue-500/20 text-blue-500', cursor: 'cursor-grab', handle: true },
+              completed: { text: 'Abgeschlossen', color: 'bg-green-500/20 text-green-500', cursor: 'cursor-default' }
+          };
+          if (song.status === 'queued') {
+            if (song.progress > 0) {
+              return { text: 'Pausiert', color: 'bg-orange-500/20 text-orange-500', cursor: 'cursor-grab', handle: true };
+            }
+            return { text: 'In Warteschlange', color: 'bg-yellow-500/20 text-yellow-500', cursor: 'cursor-grab', handle: true };
+          }
+          return statusMap[song.status];
+      }
+
+      function createSongElement(song) {
+          const info = getStatusInfo(song);
+          const li = document.createElement('li');
+          li.id = `song-${song.id}`;
+          li.dataset.songId = song.id;
+          li.className = `relative overflow-hidden`;
+          
+          li.innerHTML = `
+            <div class="delete-bg">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <div class="song-content bg-card p-4 rounded-lg flex items-center gap-3 shadow-sm relative z-10 transition-transform duration-200">
+              <div class="flex-grow flex flex-col">
+                <span class="font-semibold text-card-foreground">${song.title}</span>
+                <span class="text-sm text-muted-foreground">${song.votes} Votes</span>
+                <div class="progress-bar-container w-full bg-muted rounded-full h-1.5 mt-2" style="display: ${song.status === 'completed' ? 'none' : 'block'}">
+                  <div class="progress-bar bg-primary h-1.5 rounded-full" style="width: ${song.progress || 0}%;"></div>
+                </div>
+              </div>
+              <span class="status-badge text-xs font-bold px-2 py-1 rounded-full ${info.color}">${info.text}</span>
+              ${info.handle ? `<svg class="drag-handle h-6 w-6 text-muted-foreground ${info.cursor}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>` : ''}
+            </div>
+          `;
+          return li;
+      }
+      
+      function initializeSortable() {
+        new Sortable(elements.activeQueueList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            handle: '.drag-handle',
+            onEnd: function (evt) {
+                const songIdToStop = currentlyProcessingId;
+                if (songIdToStop) stopCurrentProcess();
+
+                const newOrderIds = Array.from(evt.to.children).map(li => li.dataset.songId);
+                const allSongsMap = new Map(songData.map(song => [song.id.toString(), song]));
+                
+                const archivedSongs = songData.filter(s => s.status === 'completed');
+                const reorderedActiveSongs = newOrderIds.map(id => allSongsMap.get(id)).filter(Boolean);
+
+                songData = [...reorderedActiveSongs, ...archivedSongs];
+
+                saveData();
+                renderAllLists();
+                processQueue();
+            }
+        });
+      }
+
+      function setupSwipeToDelete() {
+        const items = elements.activeQueueList.querySelectorAll('li');
+        items.forEach(li => {
+            const songId = parseInt(li.dataset.songId, 10);
+            const song = songData.find(s => s.id === songId);
+            
+            if (!song) return;
+
+            const songContent = li.querySelector('.song-content');
+            const deleteBg = li.querySelector('.delete-bg');
+            const mc = new Hammer.Manager(li);
+            mc.add(new Hammer.Pan({ direction: Hammer.DIRECTION_HORIZONTAL, threshold: 10 }));
+
+            mc.on('pan', function (ev) {
+                if (ev.direction === Hammer.DIRECTION_LEFT || ev.direction === Hammer.DIRECTION_RIGHT) {
+                    const percentage = Math.max(-100, Math.min(0, (ev.deltaX / li.offsetWidth) * 100));
+                    songContent.style.transform = `translateX(${percentage}%)`;
+                    deleteBg.style.opacity = Math.abs(percentage / 100);
+                }
+            });
+
+            mc.on('panend', function (ev) {
+                const percentage = (ev.deltaX / li.offsetWidth) * 100;
+                if (percentage < -40) {
+                    li.style.transition = 'transform 0.3s ease';
+                    li.style.transform = 'translateX(-100%)';
+                    setTimeout(() => {
+                        if (currentlyProcessingId === songId) {
+                            stopCurrentProcess();
+                        }
+                        songData = songData.filter(s => s.id !== songId);
+                        saveData();
+                        renderAllLists();
+                        processQueue();
+                    }, 300);
+                } else {
+                    songContent.style.transition = 'transform 0.3s ease';
+                    songContent.style.transform = 'translateX(0%)';
+                    deleteBg.style.opacity = 0;
+                    setTimeout(() => {
+                      songContent.style.transition = 'transform 0.2s';
+                    }, 300);
+                }
+            });
+        });
+      }
+      
+      function stopCurrentProcess() {
+        if (currentIntervalId) clearInterval(currentIntervalId);
+        currentIntervalId = null;
+        
+        const song = songData.find(s => s.id === currentlyProcessingId);
+        if (song) song.status = 'queued';
+        
+        currentlyProcessingId = null;
+      }
+
+      function processQueue() {
+          if (currentlyProcessingId) return;
+
+          // KORREKTUR: Wählt den letzten Song aus der Liste aus, statt des ersten.
+          const queuedSongs = songData.filter(s => s.status === 'queued');
+          if (queuedSongs.length === 0) return;
+          
+          // Nimm den letzten Song in der Liste (visuell der unterste)
+          const songToProcess = queuedSongs[queuedSongs.length - 1];
+          
+          if (!songToProcess) return;
+
+          currentlyProcessingId = songToProcess.id;
+          songToProcess.status = 'voting';
+          renderAllLists();
+
+          currentIntervalId = setInterval(() => {
+              const currentSongData = songData.find(s => s.id === currentlyProcessingId);
+              if (!currentSongData) {
+                stopCurrentProcess();
+                processQueue();
+                return;
+              }
+              const currentElement = document.getElementById(`song-${currentlyProcessingId}`);
+              const progressBar = currentElement ? currentElement.querySelector('.progress-bar') : null;
+              
+              let progress = currentSongData.progress || 0;
+              progress += 1;
+              currentSongData.progress = progress;
+              
+              if (progressBar) progressBar.style.width = `${progress}%`;
+              
+              if (progress >= 100) {
+                  const completedSong = songData.find(s => s.id === currentlyProcessingId);
+                  stopCurrentProcess();
+
+                  if(completedSong) {
+                    completedSong.status = 'completed';
+                    completedSong.completedAt = new Date().toISOString();
+                  }
+                  
+                  saveData();
+                  renderAllLists();
+                  processQueue();
+              } else {
+                  if(progress % 5 === 0) saveData();
+              }
+          }, 250);
+      }
+      
+      function saveData() {
+        try {
+            localStorage.setItem('songData', JSON.stringify(songData));
+        } catch (error) {
+            console.error("Fehler beim Speichern der Song-Daten:", error);
+        }
+      }
+      
+      init();
+    });
+  </script>
+</body>
+</html>

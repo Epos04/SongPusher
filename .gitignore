@@ -1,0 +1,9 @@
+# Abhängigkeiten von Node.js/Tailwind
+/node_modules
+
+# Build-Ordner (falls du einen hast)
+/dist
+/build
+
+# Systemdateien von macOS
+.DS_Store
