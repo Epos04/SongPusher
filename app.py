@@ -275,7 +275,11 @@ def handle_pin():
             save_json(request.get_json(), PIN_FILE)
             return jsonify({"status": "ok"})
 
+# Den Hintergrund-Worker für die Warteschlange sofort beim Laden der App starten
+worker_thread = threading.Thread(target=queue_worker, daemon=True)
+worker_thread.start()
+logging.info("Hintergrund-Worker für die Warteschlange wurde gestartet.")
+
+# Dieser Block wird jetzt nur noch für lokales Testen mit 'python app.py' benötigt
 if __name__ == '__main__':
-    worker_thread = threading.Thread(target=queue_worker, daemon=True)
-    worker_thread.start()
     app.run(host='0.0.0.0', port=5000, debug=False)
