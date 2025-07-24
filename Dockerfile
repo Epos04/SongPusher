@@ -1,12 +1,12 @@
 # Wir starten mit einem offiziellen Python-Image
 FROM python:3.11-slim
 
-# Systempakete und Google Chrome installieren
-# Das ist der Teil, der den Browser in unser System holt
+# Systempakete, jq und Google Chrome installieren
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     unzip \
+    jq \
     --no-install-recommends \
     && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' \
