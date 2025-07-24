@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm install
-COPY input.css .
+COPY static/src/input.css .
 COPY static ./static
 RUN npm run build
 
