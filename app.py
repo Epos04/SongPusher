@@ -45,7 +45,7 @@ def save_json(data, file_path):
 # ----------------------------------------------------
 
 def get_driver():
-    """Initialisiert einen einzelnen, sauberen WebDriver mit Standort-Berechtigung."""
+    """Initialisiert einen WebDriver, der für die Docker-Umgebung konfiguriert ist."""
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
@@ -53,23 +53,11 @@ def get_driver():
     options.add_argument("--window-size=1920,1080")
     options.add_argument('--blink-settings=imagesEnabled=false')
     options.add_argument("--disable-gpu")
-    options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation'])
-    options.add_experimental_option('useAutomationExtension', False)
     
-    options.add_experimental_option("prefs", {
-        "profile.default_content_setting_values.geolocation": 1
-    })
-
-    # --- ANFANG DER ÄNDERUNG FÜR RENDER ---
-    # Prüft, ob die App auf Render läuft und verwendet die Pfade des "Native Browser"-Add-ons
-    if "RENDER" in os.environ:
-        options.binary_location = os.environ.get("CHROME_PATH")
-        service = Service(executable_path=os.environ.get("DRIVER_PATH"))
-    else:
-        # Lokale Konfiguration (wie bisher)
-        service = Service(ChromeDriverManager().install())
-    # --- ENDE DER ÄNDERUNG FÜR RENDER ---
-
+    # Feste Pfade innerhalb unseres Docker-Containers
+    options.binary_location = "/usr/bin/google-chrome"
+    service = Service(executable_path="/usr/local/bin/chromedriver-linux64/chromedriver")
+    
     driver = webdriver.Chrome(service=service, options=options)
     
     location = {
